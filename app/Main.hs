@@ -1,163 +1,160 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Main where
 
 import System.Process
-import System.Environment
-import System.Exit
+    ( createProcess,
+      proc,
+      readProcessWithExitCode,
+      waitForProcess,
+      CreateProcess(std_err, std_in, std_out),
+      StdStream(UseHandle, CreatePipe) )
+import System.IO.Temp ( emptySystemTempFile )
+import Data.List (foldl', isPrefixOf)
+import System.Environment ( getArgs, getEnv, setEnv )
+import System.Exit ( ExitCode(..), exitWith )
 import System.IO
-import System.FilePath
-import System.Directory
-import Data.Time
-import Control.Exception
+    ( stderr, hClose, hPutStrLn, openFile, IOMode(AppendMode) )
+import System.Directory ( findExecutable )
+import Data.Aeson ( eitherDecode, FromJSON )
+import GHC.Generics ( Generic )
+import qualified Data.ByteString.Lazy as BL
+import Debug.Trace ( traceShowId )
+
+data Settings = Settings
+  { repository :: String
+  , password :: String
+  , excludes :: [String]
+  , files :: [String]
+  , maxFileSize :: Maybe String
+  , hourlies :: Int
+  , dailies :: Int
+  , weeklies :: Int
+  , monthlies :: Int
+  , yearlies :: Int
+  } deriving (Generic, Show)
+
+instance FromJSON Settings
 
 main :: IO ()
 main = do
   args <- getArgs
-  repo <- case args of
-            [x] -> return x
-            _ -> do
-              hPutStrLn stderr $ "Usage: backup-to-storagebox REPO"
-              exitSuccess
-  -- Set PATH to include nix profile
-  homeDir <- getHomeDirectory
-  let nixPath = homeDir </> ".nix-profile" </> "bin"
+  case args of
+    [x] -> do
+      json <- BL.readFile x
+      case eitherDecode json of
+             Left e -> do
+               hPutStrLn stderr e
+               exitWith $ ExitFailure 3
+             Right settings -> backup settings
+    _ -> do
+      hPutStrLn stderr "Usage: backup-to-storagebox path-to-settings.json"
+      exitWith $ ExitFailure 1
+
+runRestic :: Settings -> FilePath -> FilePath -> [String] -> IO ExitCode
+runRestic settings resticPath logFile extraArgs = do
+  logH <- openFile logFile AppendMode
+  (Just pipeIn, _, _, ph) <- createProcess
+    (proc "caffeinate"
+     ([ "-i"
+      , resticPath
+      , "--repo"
+      , repository settings
+      ] ++ extraArgs)
+     ){ std_in = CreatePipe
+      , std_out = UseHandle logH
+      , std_err = UseHandle logH }
+  hPutStrLn pipeIn (password settings)
+  hClose pipeIn
+  waitForProcess ph
+
+backup :: Settings -> IO ()
+backup settings = do
+  tempfile <- emptySystemTempFile "backup-to-storagebox"
+  hPutStrLn stderr $ "Logging at " ++ tempfile
+  restic <- getResticPath
+  hPutStrLn stderr $ "Using restic at " ++ restic
+
+  -- unlock just in case there are stale locks
+  _ <- runRestic settings restic tempfile [ "unlock", "--verbose" ]
+
+  bec <- runRestic settings restic tempfile $
+      [ "backup"
+      , "--exclude-caches"
+      ]
+      ++ maybe [] (\x -> [ "--exclude-larger-than" , x ]) (maxFileSize settings)
+      ++ concatMap (\e -> ["--exclude", e]) (excludes settings)
+      ++ files settings
+
+  -- use restic diff to see which files changed
+  bout <- readFile tempfile
+  dec <- case traceShowId $! extractSnapshots bout of
+    (Just parent, Just snapshot) ->
+      runRestic settings restic tempfile
+        [ "diff"
+        , parent
+        , snapshot
+        , "--verbose"
+        ]
+    _ -> do
+      hPutStrLn stderr "Could not extract snapshots for diff."
+      pure $ ExitFailure 7
+
+  fec <- case bec of
+           ExitFailure _ -> pure bec
+           ExitSuccess -> do
+             hPutStrLn stderr "Pruning repository..."
+             runRestic settings restic tempfile
+                [ "forget"
+                , "--quiet"
+                , "--prune"
+                , "--keep-hourly"
+                , show (hourlies settings)
+                , "--keep-daily"
+                , show (dailies settings)
+                , "--keep-weekly"
+                , show (weeklies settings)
+                , "--keep-monthly"
+                , show (monthlies settings)
+                , "--keep-yearly"
+                , show (yearlies settings)
+                ]
+
+  let message = "Backup finished" <>
+       (if bec == ExitSuccess && dec == ExitSuccess && fec == ExitSuccess
+           then " successfully."
+           else " with errors.") <> " Log at " <> tempfile
+  hPutStrLn stderr message
+  _ <- readProcessWithExitCode "osascript"
+    [ "-e"
+    , "display notification " <> show message <> " with title "
+       <> show "backup-to-storagebox" ] []
+  exitWith $ maximum [ bec, dec, fec ]
+
+extractSnapshots :: String -> (Maybe String, Maybe String)
+extractSnapshots out = do
+  let ls = lines out
+  foldl' go (Nothing, Nothing) ls
+ where
+   go :: (Maybe String, Maybe String) -> String -> (Maybe String, Maybe String)
+   go (Just x, Just y) _ = (Just x, Just y)
+   go (Nothing, mby) s =
+     if "using parent snapshot " `isPrefixOf` s
+        then (Just (drop 22 s), mby)
+        else (Nothing, mby)
+   go (Just x, Nothing) s =
+     if "snapshot " `isPrefixOf` s
+        then (Just x, Just (takeWhile (/= ' ') (drop 9 s)))
+        else (Just x, Nothing)
+
+getResticPath :: IO FilePath
+getResticPath = do
+  let brewPath = "/opt/homebrew/bin"
   path <- getEnv "PATH"
-  setEnv "PATH" (nixPath ++ ":" ++ path)
+  setEnv "PATH" (path ++ ":" ++ brewPath)
   mbrestic <- findExecutable "restic"
-  restic <- case mbrestic of
-              Just x -> return x
-              Nothing -> do
-                hPutStrLn stderr $ "restic not found in path"
-                exitWith $ ExitFailure 1
-  withSystemTempFile "backup-to-storagebox.XXX" $ \fp h -> do
-    hPutStrLn stderr $ "Logging at " ++ fp
-    backup restic repo h
-    forget restic repo h
-    hPutStrLn stderr "Backup succeeded."
-    exitWith ExitSuccess
+  case mbrestic of
+     Just x -> pure x
+     Nothing -> do
+       hPutStrLn stderr "restic not found in path"
+       exitWith $ ExitFailure 1
 
-backup :: FilePath -> FilePath -> Handle -> IO ()
-
-backup :: FilePath -> String -> Handle -> IO (String, String)
-backup restic repo logh = do
-  -- backup
-  -- diff
-  return ()
-
-forget :: FilePath -> String -> Handle -> IO ()
-forget restic repo logh = do
-  return ()
-
-{-
-
-  -- Run backup and forget commands
-  result <- runBackup homeDir logFile
-
-  -- Extract parent and snapshot IDs from log
-  logContent <- readFile logFile
-  let parentId = extractParentSnapshot logContent
-      snapshotId = extractSnapshot logContent
-
-  -- Run diff command if we have both IDs
-  case (parentId, snapshotId) of
-    (Just parent, Just snapshot) -> do
-      _ <- runDiff homeDir logFile parent snapshot
-      return ()
-    _ -> return ()
-
-  -- Determine status and create notification
-  finalLogContent <- readFile logFile
-  let status = determineStatus result finalLogContent
-      message = "Backup finished " ++ status ++ " for storagebox:" ++ repo ++ ". Log at " ++ logFile
-
-  putStrLn message
-  _ <- runNotification message
-  return ()
-
-runBackup :: FilePath -> FilePath -> IO ExitCode
-runBackup homeDir logFile = do
-  let passwordFile = homeDir </> "Private" </> ("storagebox-" ++ repo ++ ".pwd")
-      repoPath = "sftp:storagebox:" ++ repo
-      filesFrom = homeDir </> ".config" </> "restic" </> ("files." ++ repo ++ ".lst")
-      excludeFile = homeDir </> ".config" </> "restic" </> ("excludes." ++ repo ++ ".lst")
-
-  -- Run backup command
-  backupProc <- createProcess (proc "caffeinate" ["-i", "restic", "backup",
-    "--password-file", passwordFile,
-    "--repo", repoPath,
-    "--files-from", filesFrom,
-    "--exclude-file", excludeFile,
-    "--one-file-system"]) { std_out = UseHandle =<< openFile logFile WriteMode,
-                                                   std_err = UseHandle =<< openFile logFile AppendMode }
-
-  backupResult <- waitForProcess (processHandle backupProc)
-
-  case backupResult of
-    ExitSuccess -> do
-      -- Run forget command
-      logHandle <- openFile logFile AppendMode
-      forgetProc <- createProcess (proc "caffeinate" ["-i", "restic", "forget",
-        "--password-file", passwordFile,
-        "--repo", repoPath,
-        "--quiet",
-        "--prune",
-        "--keep-daily", "7",
-        "--keep-weekly", "5",
-        "--keep-monthly", "12",
-        "--keep-yearly", "50"]) { std_out = UseHandle logHandle,
-                                   std_err = UseHandle logHandle }
-
-      hClose logHandle
-      waitForProcess (processHandle forgetProc)
-    _ -> return backupResult
-
-runDiff :: FilePath -> FilePath -> String -> String -> IO ExitCode
-runDiff homeDir logFile parentId snapshotId = do
-  let passwordFile = homeDir </> "Private" </> ("storagebox-" ++ repo ++ ".pwd")
-      repoPath = "sftp:storagebox:" ++ repo
-
-  logHandle <- openFile logFile AppendMode
-  diffProc <- createProcess (proc "caffeinate" ["-i", "restic", "diff", parentId, snapshotId,
-    "--password-file", passwordFile,
-    "--repo", repoPath]) { std_out = UseHandle logHandle,
-                           std_err = UseHandle logHandle }
-
-  hClose logHandle
-  waitForProcess (processHandle diffProc)
-
-runNotification :: String -> IO ExitCode
-runNotification message = do
-  (_, _, _, procHandle) <- createProcess (proc "osascript" ["-e",
-    "display notification \"" ++ message ++ "\" with title \"restic\""])
-  waitForProcess procHandle
-
-extractParentSnapshot :: String -> Maybe String
-extractParentSnapshot content =
-  case filter ("using parent snapshot" `isInfixOf`) (lines content) of
-    (line:_) -> case words line of
-      (_:_:_:snapshotId:_) -> Just snapshotId
-      _ -> Nothing
-    [] -> Nothing
-  where
-    isInfixOf needle haystack = needle `elem` [take (length needle) (drop i haystack) | i <- [0..length haystack - length needle]]
-
-extractSnapshot :: String -> Maybe String
-extractSnapshot content =
-  case filter ("snapshot" `isInfixOf`) (filter ("saved" `isInfixOf`) (lines content)) of
-    (line:_) -> case words line of
-      (_:snapshotId:_) -> Just snapshotId
-      _ -> Nothing
-    [] -> Nothing
-  where
-    isInfixOf needle haystack = needle `elem` [take (length needle) (drop i haystack) | i <- [0..length haystack - length needle]]
-
-determineStatus :: ExitCode -> String -> String
-determineStatus ExitFailure{} _ = "with errors"
-determineStatus ExitSuccess content
-  | any (\line -> "error:" `isInfixOf` map toLower line || "Error:" `isInfixOf` line) (lines content) = "with errors"
-  | any (\line -> "warning" `isInfixOf` map toLower line || "Warning" `isInfixOf` line) (lines content) = "with warnings"
-  | otherwise = "successfully"
-  where
-    isInfixOf needle haystack = needle `elem` [take (length needle) (drop i haystack) | i <- [0..length haystack - length needle]]
-    toLower c | c >= 'A' && c <= 'Z' = toEnum (fromEnum c + 32)
-              | otherwise = c
--}

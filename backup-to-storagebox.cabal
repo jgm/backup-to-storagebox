@@ -17,8 +17,9 @@ executable backup-to-storagebox
     main-is:          Main.hs
     build-depends:    base ^>=4.19.2.0
                     , process
-                    , filepath
                     , directory
-                    , time
+                    , temporary
+                    , aeson
+                    , bytestring
     hs-source-dirs:   app
     default-language: Haskell2010
