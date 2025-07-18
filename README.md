@@ -114,13 +114,10 @@ an example to customize:
 	<string>/tmp/backup-to-storagebox.log</string>
 	<key>StandardErrorPath</key>
 	<string>/tmp/backup-to-storagebox.log</string>
-    <key>StartCalendarInterval</key>
-    <dict>
-       <key>Hour</key>
-       <integer>1</integer>
-       <key>Minute</key>
-       <integer>41</integer>
-    </dict>
+    <key>StartInterval</key>
+    <integer>3600</integer>
+    <key>RunAtLoad</key>
+    <true/>
 </dict>
 </plist>
 ```
