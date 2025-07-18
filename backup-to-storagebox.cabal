@@ -21,5 +21,6 @@ executable backup-to-storagebox
                     , temporary
                     , aeson
                     , bytestring
+                    , time
     hs-source-dirs:   app
     default-language: Haskell2010

@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveGeneric #-}
 module Main where
 
@@ -8,16 +9,19 @@ import System.Process
       waitForProcess,
       CreateProcess(std_err, std_in, std_out),
       StdStream(UseHandle, CreatePipe) )
-import System.IO.Temp ( emptySystemTempFile )
+import System.IO.Temp ( emptySystemTempFile, getCanonicalTemporaryDirectory)
 import Data.List (foldl', isPrefixOf)
+import Data.Time (getCurrentTime, nominalDiffTimeToSeconds, diffUTCTime)
 import System.Environment ( getArgs, getEnv, setEnv )
 import System.Exit ( ExitCode(..), exitWith )
 import System.IO
     ( stderr, hClose, hPutStrLn, openFile, IOMode(AppendMode) )
-import System.Directory ( findExecutable )
+import System.Directory ( findExecutable, getModificationTime)
 import Data.Aeson ( eitherDecode, FromJSON )
 import GHC.Generics ( Generic )
 import qualified Data.ByteString.Lazy as BL
+import Control.Exception as E
+import Control.Monad (unless, void)
 import Debug.Trace ( traceShowId )
 
 data Settings = Settings
@@ -69,6 +73,9 @@ runRestic settings resticPath logFile extraArgs = do
 
 backup :: Settings -> IO ()
 backup settings = do
+  tempdir <- getCanonicalTemporaryDirectory
+  let purgeSentinal =
+        tempdir <> "/backup-storagebox." <> repository settings <> ".purged"
   tempfile <- emptySystemTempFile "backup-to-storagebox"
   hPutStrLn stderr $ "Logging at " ++ tempfile
   restic <- getResticPath
@@ -99,13 +106,17 @@ backup settings = do
       hPutStrLn stderr "Could not extract snapshots for diff."
       pure $ ExitFailure 7
 
+  current <- getCurrentTime
+  isOld <- E.catch ((\t -> nominalDiffTimeToSeconds
+                              (diffUTCTime current t) > (24 * 3600))
+                            <$> getModificationTime purgeSentinal)
+                       (\(_ :: SomeException) -> pure True)
+
   fec <- case bec of
-           ExitFailure _ -> pure bec
-           ExitSuccess -> do
+           ExitSuccess | isOld -> do
              hPutStrLn stderr "Pruning repository..."
-             runRestic settings restic tempfile
+             fec' <- runRestic settings restic tempfile
                 [ "forget"
-                , "--quiet"
                 , "--prune"
                 , "--keep-hourly"
                 , show (hourlies settings)
@@ -118,17 +129,25 @@ backup settings = do
                 , "--keep-yearly"
                 , show (yearlies settings)
                 ]
+             writeFile purgeSentinal mempty
+             pure fec'
+           _ -> pure bec
+
+  let ec = maximum [ bec, dec, fec ]
 
   let message = "Backup finished" <>
-       (if bec == ExitSuccess && dec == ExitSuccess && fec == ExitSuccess
+       (if ec == ExitSuccess
            then " successfully."
            else " with errors.") <> " Log at " <> tempfile
   hPutStrLn stderr message
-  _ <- readProcessWithExitCode "osascript"
-    [ "-e"
-    , "display notification " <> show message <> " with title "
-       <> show "backup-to-storagebox" ] []
-  exitWith $ maximum [ bec, dec, fec ]
+  h <- openFile tempfile AppendMode
+  hPutStrLn h message
+  unless (ec == ExitSuccess) $ void $
+    readProcessWithExitCode "osascript"
+      [ "-e"
+      , "display notification " <> show message <> " with title "
+         <> show "backup-to-storagebox" ] []
+  exitWith ec
 
 extractSnapshots :: String -> (Maybe String, Maybe String)
 extractSnapshots out = do

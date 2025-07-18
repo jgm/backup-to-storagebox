@@ -75,9 +75,10 @@ The tool performs the following steps:
    - Excludes files over a certain size (e.g. 2G)
 3. Compares the new snapshot with the previous one using `restic diff`
    and puts the differences in the log.
-4. Prunes old snapshots according to retention policy, with a specified
-   number of hourlies, dailies, weeklies, monthlies, and yearlies.
-5. Issues a macOS notification
+4. Every 24 hours: prunes old snapshots according to retention
+   policy, with a specified number of hourlies, dailies,
+   weeklies, monthlies, and yearlies.
+5. Issues a macOS notification if there were errors.
 
 ## macOS Integration
 
