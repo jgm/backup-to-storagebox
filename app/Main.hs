@@ -35,6 +35,7 @@ data Settings = Settings
   , weeklies :: Int
   , monthlies :: Int
   , yearlies :: Int
+  , emailOnError :: Maybe String
   } deriving (Generic, Show)
 
 instance FromJSON Settings
@@ -142,11 +143,28 @@ backup settings = do
   hPutStrLn stderr message
   h <- openFile tempfile AppendMode
   hPutStrLn h message
-  unless (ec == ExitSuccess) $ void $
+  hClose h
+  unless (ec == ExitSuccess) $ void $ do
     readProcessWithExitCode "osascript"
       [ "-e"
       , "display notification " <> show message <> " with title "
          <> show "backup-to-storagebox" ] []
+    case emailOnError settings of
+      Nothing -> pure ()
+      Just address -> do
+        fullLog <- readFile tempfile
+        (sec, sout, serr) <- readProcessWithExitCode "osascript"
+          [ "-e"
+          , "tell application " <> show "Mail" <> "\n" <>
+            "  set newMessage to make new outgoing message with properties {subject:\"backup-to-storagebox error\", content:" <> show fullLog <>
+            ", visible:true}\n" <>
+            "  tell newMessage\n" <>
+            "    make new to recipient at end of to recipients with properties {address: " <> show address <> "}\n" <>
+            "  end tell\n" <>
+            "  send newMessage\n" <>
+            "end tell"
+          ] []
+        unless (sec == ExitSuccess) $ hPutStrLn stderr (sout ++ serr)
   exitWith ec
 
 extractSnapshots :: String -> (Maybe String, Maybe String)
