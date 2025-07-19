@@ -20,6 +20,16 @@ jobs:
         ghcup install ghc --set 9.8
         ghcup install cabal --set 3.14
 
+    # declare/restore cached things
+
+    - name: Cache cabal global package db
+      id:   cabal-global
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.local/state/cabal
+        key: ${{ runner.os }}-${{ matrix.versions.ghc }}-${{ matrix.versions.cabal }}-cabal-global-${{ secrets.CACHE_VERSION }}
+
     - name: Install dependencies
       run: |
           ghc --version
@@ -46,6 +56,13 @@ jobs:
       run: |
         ghcup install ghc --set 9.8
         ghcup install cabal --set 3.14
+    - name: Cache cabal global package db
+      id:   cabal-global
+      uses: actions/cache@v4
+      with:
+        path: |
+          C:\cabal\store
+        key: ${{ runner.os }}-appdata-cabal-${{ hashFiles('cabal.project') }}-${{ secrets.CACHE_VERSION }}
     - name: Install dependencies
       run: |
           cabal update
@@ -76,6 +93,14 @@ jobs:
         ghcup install ghc --set 9.8
         ghcup install cabal --set 3.14
         echo "$HOME/.ghcup/bin" >> "${GITHUB_PATH}"
+    - name: Cache cabal global package db
+      id:   cabal-global
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cabal
+        key: ${{ runner.os }}-${{ matrix.versions.ghc }}-${{ matrix.versions.cabal }}-cabal-global-${{ secrets.CACHE_VERSION }}
+
     - name: Install dependencies
       run: |
           cabal update
