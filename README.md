@@ -40,7 +40,7 @@ Create a JSON configuration file with your backup settings:
   "maxFileSize": "2G",
   "hourlies": 2,
   "dailies": 7,
-  "weekies": 4,
+  "weeklies": 4,
   "monthlies": 12,
   "yearlies": 50
 }
