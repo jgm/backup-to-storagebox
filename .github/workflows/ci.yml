@@ -1,0 +1,94 @@
+name: Nightly
+
+on:
+  push:
+    branches:
+    - '*'
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install ghc
+      run: |
+        ghcup install ghc --set 9.8
+        ghcup install cabal --set 3.14
+
+    - name: Install dependencies
+      run: |
+          ghc --version
+          cabal --version
+          cabal update
+          cabal build --dependencies-only
+    - name: Build and install artifact
+      run: |
+          export ARTIFACTS=linux
+          mkdir -p ${ARTIFACTS}
+          cabal install --installdir="${ARTIFACTS}" --install-method=copy
+          strip "${ARTIFACTS}/*"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: linux
+        path: linux
+
+  windows:
+
+    runs-on: windows-2022
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install ghc
+      run: |
+        ghcup install ghc --set 9.8
+        ghcup install cabal --set 3.14
+    - name: Install dependencies
+      run: |
+          cabal update
+          cabal build --dependencies-only
+    - name: Build artifacts
+      shell: cmd
+      run: |
+          for /f %%a in ('powershell -Command "Get-Date -format yyyy-MM-dd"') do set THEDATE=%%a
+          set ARTIFACTS=%CD%\windows
+          mkdir %ARTIFACTS%
+          cabal install --install-method=copy --installdir=%ARTIFACTS%
+          strip %ARTIFACTS%/*
+    - uses: actions/upload-artifact@v4
+      with:
+        name: windows
+        path: windows
+
+  macos:
+
+    runs-on: macos-l3
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install ghcup
+      run: |
+        brew install ghcup
+    - name: Install ghc
+      run: |
+        ghcup install ghc --set 9.8
+        ghcup install cabal --set 3.14
+        echo "$HOME/.ghcup/bin" >> "${GITHUB_PATH}"
+    - name: Install dependencies
+      run: |
+          cabal update
+          cabal build --dependencies-only
+    - name: Build artifacts
+      run: |
+          export ARTIFACTS=macos
+          mkdir -p ${ARTIFACTS}
+          cabal install --install-method=copy --installdir="${ARTIFACTS}"
+          strip "${ARTIFACTS}/*"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: macos
+        path: macos
