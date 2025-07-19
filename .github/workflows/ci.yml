@@ -31,7 +31,6 @@ jobs:
           export ARTIFACTS=linux
           mkdir -p ${ARTIFACTS}
           cabal install --installdir="${ARTIFACTS}" --install-method=copy
-          strip "${ARTIFACTS}/*"
     - uses: actions/upload-artifact@v4
       with:
         name: linux
@@ -58,7 +57,6 @@ jobs:
           set ARTIFACTS=%CD%\windows
           mkdir %ARTIFACTS%
           cabal install --install-method=copy --installdir=%ARTIFACTS%
-          strip %ARTIFACTS%/*
     - uses: actions/upload-artifact@v4
       with:
         name: windows
@@ -87,7 +85,6 @@ jobs:
           export ARTIFACTS=macos
           mkdir -p ${ARTIFACTS}
           cabal install --install-method=copy --installdir="${ARTIFACTS}"
-          strip "${ARTIFACTS}/*"
     - uses: actions/upload-artifact@v4
       with:
         name: macos
