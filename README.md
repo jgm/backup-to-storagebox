@@ -100,25 +100,25 @@ an example to customize:
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>backup-to-storagebox</string>
-	<key>ProgramArguments</key>
-	<array>
-	  <string>/Users/USER/.local/bin/backup-to-storagebox</string>
+  <dict>
+    <key>Label</key>
+    <string>backup-to-storagebox</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/Users/USER/.local/bin/backup-to-storagebox</string>
       <string>/Users/USER/.config/backup-to-storagebox/backup-work.json</string>
-	</array>
+    </array>
     <key>WorkingDirectory</key>
-	<string>/Users/USER</string>
-	<key>StandardOutPath</key>
-	<string>/tmp/backup-to-storagebox.log</string>
-	<key>StandardErrorPath</key>
-	<string>/tmp/backup-to-storagebox.log</string>
+    <string>/Users/USER</string>
+    <key>StandardOutPath</key>
+    <string>/tmp/backup-to-storagebox.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/backup-to-storagebox.log</string>
     <key>StartInterval</key>
     <integer>3600</integer>
     <key>RunAtLoad</key>
     <true/>
-</dict>
+  </dict>
 </plist>
 ```
 
