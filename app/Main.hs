@@ -4,6 +4,7 @@ module Main where
 
 import System.Process
     ( createProcess,
+      readProcess,
       proc,
       readProcessWithExitCode,
       waitForProcess,
@@ -84,6 +85,9 @@ backup settings = do
 
   -- unlock just in case there are stale locks
   _ <- runRestic settings restic tempfile [ "unlock", "--verbose" ]
+
+  whoami <- readProcess "whoami" [] ""
+  hPutStrLn stderr $ "whoami = " <> whoami
 
   bec <- runRestic settings restic tempfile $
       [ "backup"
