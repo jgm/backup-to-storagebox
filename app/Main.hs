@@ -26,6 +26,7 @@ import Debug.Trace ( traceShowId )
 
 data Settings = Settings
   { repository :: String
+  , hostname :: Maybe String
   , password :: String
   , excludes :: [String]
   , files :: [String]
@@ -88,6 +89,9 @@ backup settings = do
       [ "backup"
       , "--exclude-caches"
       ]
+      ++ (case hostname settings of
+           Nothing -> []
+           Just h -> ["--host", h])
       ++ maybe [] (\x -> [ "--exclude-larger-than" , x ]) (maxFileSize settings)
       ++ concatMap (\e -> ["--exclude", e]) (excludes settings)
       ++ files settings

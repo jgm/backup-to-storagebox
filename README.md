@@ -26,6 +26,7 @@ Create a JSON configuration file with your backup settings:
 
 ```json
 {
+  "hostname": "your-hostname",
   "repository": "sftp:user@your-storage-box.com:reponame",
   "password": "your-restic-repository-password",
   "excludes": [
@@ -48,6 +49,10 @@ Create a JSON configuration file with your backup settings:
 
 Because this contains a password, make sure it is only readable by
 the user (`chmod 600`).
+
+`"hostname"` can be omitted, in which case the host will be set dynamically
+to the value returned by `hostname`. But it is a good idea to set it
+manually if your environment will modify the hostname (e.g. via a VPN).
 
 Then run the backup:
 
