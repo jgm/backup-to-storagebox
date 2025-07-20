@@ -1,19 +1,21 @@
 # backup-to-storagebox
 
-A macOS backup utility that uses [restic](https://restic.net/) to
+A backup utility that uses [restic](https://restic.net/) to
 backup files to a remote repository (designed for Hetzner Storage
-Box or similar services).  This could have been a shell script,
-but macOS only allows binaries to be given full disk permission,
-so it is a Haskell program.  A single JSON configuration file
-contains all the information needed for a backup. When the backup
-is complete, a macOS notification is issued, including the path of
-the (temporary) log file.
+Box or similar services).  A single JSON configuration file contains all
+the information needed for a backup. When the backup is complete, a
+macOS notification is issued, including the path of the (temporary) log
+file.
+
+The backup script can be used on its own, but if it is to be run
+in a macOS LaunchAgent, it needs to have "full disk access"
+granted, and this can only be granted to a binary, not a script.
+So this repository includes a Makefile that will compile the
+script into binary via C.
 
 ## Prerequisites
 
-- [restic](https://restic.net/) installed and available in PATH
-  (`brew install restic`).
-- Haskell build environment (`brew install ghc cabal`).
+- [restic](https://restic.net/) installed and available in PATH.
 
 ## Installation
 

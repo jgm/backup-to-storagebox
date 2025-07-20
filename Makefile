@@ -1,8 +1,21 @@
-build:
-	cabal build
+backup: backup.o
 
-install:
-	cabal install --install-method=copy --installdir=$$HOME/.local/bin
+backup.c: backup.sh
+	echo "#include <stdio.h>" > $@
+	echo "#include <stdlib.h>" >> $@
+	echo "" >> $@
+	xxd -i backup.sh >> $@
+	echo "" >> $@
+	echo "int main()" >> $@
+	echo "{" >> $@
+	echo "  system((char *)backup_sh);" >> $@
+	echo "  return 0;" >> $@
+	echo "}" >> $@
 
-.PHONY: build install
+clean:
+	-rm backup.c
 
+install: backup
+	cp $< $$HOME/.local/bin/
+
+.PHONY: clean install
