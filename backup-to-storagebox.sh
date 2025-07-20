@@ -1,12 +1,16 @@
 #!/bin/sh
 set -e
 
-if [ "$#" -ne 1 ]; then
-  echo "Usage: backup-to-storagebox config.json"
-  exit 1
+if [ "$#" -eq 1 ]; then
+  CONFIG="$1" 
+else
+  if [ -z "$BACKUP_TO_STORAGEBOX_CONFIG" ]; then
+    echo "Usage: backup-to-storagebox config.json"
+    exit 1
+  else
+    CONFIG="$BACKUP_TO_STORAGEBOX_CONFIG"
+  fi
 fi
-
-CONFIG="$1"
 
 config () {
   jq -r "$1" < "$CONFIG"
