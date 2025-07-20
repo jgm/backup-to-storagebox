@@ -55,7 +55,7 @@ err_exit () {
         if [ "$UNAME" = "Darwin" ]; then
           osascript -e "display notification \"$MESSAGE\" with title \"$TITLE\""
         fi
-        echo "$MESSAGE" | mail -s "$TITLE" $(whoami)
+        # echo "$MESSAGE" | mail -s "$TITLE" $(whoami)
 	exit 1
 }
 
@@ -76,8 +76,8 @@ DIFFARGS=$(restic snapshots latest --json | jq -r '.[0] | (.parent,.id)')
 echo "Getting diff of $DIFFARGS"
 restic diff $DIFFARGS
 
-# Purge if we haven't done it for a week:
-find "$PURGESENTINAL" -mtime -7 || \
+# Purge if we haven't done it for a day:
+find "$PURGESENTINAL" -mtime -1 || \
   restic forget --prune \
     --keep-daily "$DAILIES" \
     --keep-weekly "$WEEKLIES" \

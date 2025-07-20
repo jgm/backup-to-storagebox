@@ -9,7 +9,7 @@ file.
 
 The backup script can be used on its own, but if it is to be run
 in a macOS LaunchAgent, it needs to have "full disk access"
-granted, and this can only be granted to a binary, not a script.
+granted, and this can only be done for a binary, not a script.
 So this repository includes a Makefile that will compile the
 script into binary via C.
 
@@ -87,16 +87,9 @@ The tool performs the following steps:
    weeklies, monthlies, and yearlies.
 5. Issues a macOS notification if there were errors.
 
-## macOS Integration
-
-The tool is designed to work well with macOS:
-
-- Uses `caffeinate` to prevent system sleep during backup
-- Sends desktop notifications using `osascript`
-
 ## Logging
 
-All backup operations are logged to a temporary file. The log file path is displayed at the start of the backup and in the final notification.
+All backup operations are logged to stdout and stderr.
 
 ## Scheduling using a LaunchAgent
 
@@ -110,6 +103,8 @@ an example to customize:
   <dict>
     <key>Label</key>
     <string>backup-to-storagebox</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/sbin</string>
     <key>ProgramArguments</key>
     <array>
       <string>/Users/USER/.local/bin/backup-to-storagebox</string>
