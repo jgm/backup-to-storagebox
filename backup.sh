@@ -12,6 +12,13 @@ config () {
   jq -r "$1" < "$CONFIG"
 }
 
+UNAME=$(uname)
+
+# Don't go to sleep while we're backing up.
+if [ "$UNAME" = "Darwin" ]; then
+  CAFFEINATE="caffeinate -i"
+fi
+
 HOSTNAME=$(config '.hostname')
 if [ "$HOSTNAME" = "null" ]; then
   HOSTNAME="$(hostname)"
@@ -36,7 +43,7 @@ for file in "$EXCLUDES"; do
 done
 
 restic () {
-  echo "$PASSWORD" | /opt/homebrew/bin/restic -r "$REPO" "$@"
+  echo "$PASSWORD" | $CAFFEINATE restic -r "$REPO" "$@"
 }
 
 echo "-------------------------------- $(date)"
@@ -45,7 +52,10 @@ err_exit () {
         echo "Finished with errors."
         MESSAGE="Backup finished with errors. Check log for details."
         TITLE="backup"
-        osascript -e "display notification \"$MESSAGE\" with title \"$TITLE\""
+        if [ "$UNAME" = "Darwin" ]; then
+          osascript -e "display notification \"$MESSAGE\" with title \"$TITLE\""
+        fi
+        echo "$MESSAGE" | mail -s "$TITLE" $(whoami)
 	exit 1
 }
 
