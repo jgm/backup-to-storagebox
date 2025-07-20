@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 config.json"
+  echo "Usage: backup-to-storagebox config.json"
   exit 1
 fi
 
@@ -59,7 +59,7 @@ err_exit () {
 	exit 1
 }
 
-trap 'err_exit' ERR SIGHUP SIGQUIT SIGINT SIGTERM
+trap '[ $? -eq 0 ] && exit 0 || err_exit' EXIT
 
 # First unlock any stale locks left over from failed backups...
 restic unlock

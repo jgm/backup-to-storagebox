@@ -1,6 +1,6 @@
-backup-to-storage-box: backup-to-storage-box.o
+backup-to-storagebox: backup-to-storagebox.o
 
-backup-to-storage-box.c: backup-to-storage-box.sh
+backup-to-storagebox.c: backup-to-storagebox.sh
 	echo "#include <stdio.h>" > $@
 	echo "#include <stdlib.h>" >> $@
 	echo "" >> $@
@@ -8,14 +8,14 @@ backup-to-storage-box.c: backup-to-storage-box.sh
 	echo "" >> $@
 	echo "int main()" >> $@
 	echo "{" >> $@
-	echo "  system((char *)backup_to_storage_box_sh);" >> $@
+	echo "  system((char *)backup_to_storagebox_sh);" >> $@
 	echo "  return 0;" >> $@
 	echo "}" >> $@
 
 clean:
-	-rm backup-to-storage-box.{c,o}
+	-rm backup-to-storagebox.{c,o}
 
-install: backup-to-storage-box
+install: backup-to-storagebox
 	cp $< $$HOME/.local/bin/
 
 .PHONY: clean install
