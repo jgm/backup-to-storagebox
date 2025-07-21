@@ -74,7 +74,7 @@ restic backup --host "$HOSTNAME" \
   --exclude-caches --exclude-larger-than "$MAXFILESIZE" \
   --exclude-file "$EXCLUDEFILE" \
   --verbose \
-  "$FILES"
+  $FILES
 
 # Get a diff with the last snapshot
 DIFFARGS=$(restic snapshots latest --json | jq -r '.[0] | (.parent,.id)')
