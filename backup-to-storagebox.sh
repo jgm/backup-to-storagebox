@@ -39,6 +39,7 @@ WEEKLIES=$(config '.weeklies')
 MONTHLIES=$(config '.monthlies')
 YEARLIES=$(config '.yearlies')
 MAXFILESIZE=$(config '.maxFileSize')
+RESTICPATH=$(which restic || echo '/opt/homebrew/bin/restic')
 
 # Populate exclude file:
 truncate -s 0 "$EXCLUDEFILE"
@@ -47,7 +48,7 @@ for file in "$EXCLUDES"; do
 done
 
 restic () {
-  echo "$PASSWORD" | $CAFFEINATE restic -r "$REPO" "$@"
+  echo "$PASSWORD" | $CAFFEINATE $RESTICPATH -r "$REPO" "$@"
 }
 
 echo "-------------------------------- $(date)"

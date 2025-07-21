@@ -103,8 +103,6 @@ an example to customize:
   <dict>
     <key>Label</key>
     <string>backup-to-storagebox</string>
-    <key>PATH</key>
-    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/sbin</string>
     <key>ProgramArguments</key>
     <array>
       <string>/Users/USER/.local/bin/backup-to-storagebox</string>
